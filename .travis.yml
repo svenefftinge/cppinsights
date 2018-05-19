@@ -88,6 +88,32 @@ matrix:
       ssh_known_hosts: cppinsights.io
     env: COMPILER='clang++-6.0' COMPILER_CC='clang-6.0' LLVM_CONFIG='/usr/bin/llvm-config-6.0' COVERAGE='No' DEPLOY='Yes' STATIC='Yes' DEBUG='No' UPLOAD='Yes'
 
+    # 4/ Linux Coverity Builds
+  - os: linux
+    compiler: gcc
+    addons:
+      apt:
+        sources: *all_sources
+        packages:
+        - g++-7
+        - libstdc++-6-dev
+        - *all_llvm_current_packages
+      coverity_scan:
+        project:
+          name: "andreasfertig/cppinsights"
+          description: "C++ Insights"
+        notification_email: "andy@cppinsights.io"
+        #        build_command_prepend: "cov-configure --comptype g++ --compiler /usr/bin/bin/g++-7 && cd $TRAVIS_BUILD_DIR/build && cmake -DINSIGHTS_LLVM_CONFIG=${LLVM_CONFIG} -DINSIGHTS_COVERAGE=${COVERAGE} -DINSIGHTS_STATIC=${STATIC} -DDEBUG=${DEBUG}  .."
+        build_command_prepend: "cd $TRAVIS_BUILD_DIR/build && cmake -DINSIGHTS_LLVM_CONFIG=${LLVM_CONFIG} -DINSIGHTS_COVERAGE=${COVERAGE} -DINSIGHTS_STATIC=${STATIC} -DDEBUG=${DEBUG}  .."
+        build_command: make -j 2
+        branch_pattern: coverity_scan    
+    env: COMPILER='g++-7' COMPILER_CC='gcc-7' LLVM_CONFIG=${LLVM_CONFIG_CURRENT} STATIC='No' COVERAGE='Yes' DEBUG='No' COVERITY_RUN=1 NO_LINKING=Yes
+
+before_install:
+  - |
+    if [ "${COVERITY_SCAN_BRANCH}" == 1 ]; then
+        echo -n | openssl s_client -connect 'scan.coverity.com:443' | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
+    fi
 install:
 - |   
   if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then
@@ -114,13 +140,18 @@ before_script:
     fi
   - export CXX=${COMPILER}
   - export CC=${COMPILER_CC}
-  - cd "${TRAVIS_BUILD_DIR}"
-  - mkdir build
-  - cd build
-  - cmake -DINSIGHTS_LLVM_CONFIG=${LLVM_CONFIG} -DINSIGHTS_COVERAGE=${COVERAGE} -DINSIGHTS_STATIC=${STATIC} -DDEBUG=${DEBUG}  ..
+  - mkdir -p ${TRAVIS_BUILD_DIR}/build
+  - cd ${TRAVIS_BUILD_DIR}/build
+  - |
+    if [ "${COVERITY_RUN}" != 1 ]; then
+      cmake -DINSIGHTS_LLVM_CONFIG=${LLVM_CONFIG} -DINSIGHTS_COVERAGE=${COVERAGE} -DINSIGHTS_STATIC=${STATIC} -DDEBUG=${DEBUG}  ..
+    fi
 
 script:
-- make -j 2
+- |
+  if [ "${COVERITY_RUN}" != 1 ]; then
+    make -j 2
+  fi
 - |
   if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then
     make tests
@@ -193,4 +224,5 @@ env:
   - secure: MI6S+9up0JKkDxrW7b248Ro7auyyVogdwSj/UsTLNTKMBwNOaK4HccDNif6K2qAJmTlGt1xFHh0cHXvTkACcUc8hvZghJVGUOOCaWK9YvwR8wwQgoFi034BjG/Tg7Uj6WX6G65mv0UVv/2dxZRghDTujCnFiZOoSpApBvqFjQ/gamP7P+vjJiWQVJWJTOhYHz/oK6jQHMMlNeRJbzZhp/kgo7LPtdGZVT95+S6Xn3rHIuj5pJdgwYf/NFckWI9rkkkqn47XqYozGf5HHnBlcZEDCdGEQzI8HDngRC5mjejEMCKd2mBJP319xO8UDesplpabzZhAqucskKynVK9lqFlHtdYn7dvSLXHUF9oPAWoMckxDmNIBqarEy5kYZG+ccRm4xmP2V7JAfGpW7HAtLycXEHs5Fxf839IfyTHMIp6fF+a/t2M6SE/m4rZ3Ser7Y09EAeGqUKgvc/YQwkSSdrRxE1bMIfHES6/IRdSMGkAOa1U74ulqN3FzdfKX2Ng93EZ15zXiHqipljmlPDiC8BFXG3VEbFMubKBuvB8c5KjlpwuU5Udk9cehGWDLDcKi0K7PZpZ1p2l1aU17y8QxFEcOUw6Q/nYbZ9gEf7eF5DrpycSyv6xpGyYq59LrL5m5/XUAQ9ZLN+92rQlMXZqRncMll2ZJX5Tzb+PeO8P1y7mA=
   - secure: CFbIrswqs8U7pCMnF57QrC/KgNlybr5SNFlKE9BHA9I9WXcjLBGm3tv9JM7TvzwD5ivhe9P/MVcc1ROaTSPVRSdOI9aQuNBauDYoab1OrlO0SFnHjr6tKzvw9P+wnfuyawhH8vm6m/cdyyIKagFUKtFSKUnpLeakTEUUG6O9IBLHzBa0BTqlmviV9OjDUjD61adUSWVWe96T6A/tlGyFAWAYuAU1jvGN9HSE06mFlGC0NmbT25kq/8SGv9+9KoGgXNFB6lsQ6C5C3cWIlsaO0EtTnLGa2IfSZk4lg4CzZ97CGcraH5avrG5guSDWUGZEe8a+rxA42SvrhKVRDhu3qz0agH1BlXi+0q7k8oS7wAaRG63sjyD0DtFlA783bQmdLXh/BY5rz1FsqV9rr8qVdfo+5cVfW6sOZLrNeyF8OcxWAln5SNiuLpAb2cYTGNJ15J0KLynYBL/6e3Qe6gsUS4BIHFORr9dHMXA3TBnqEIo4hzJwnGNDixs7rLXCmdX3uxsAHUJEtSxm63AiCNvZhWq6Lm+Lf1CKQ9mNRzUT3IQGwuhCmv6XFR/ZTCFCiXwwC6lTy1ItC6c/90quMZpdxTcUVts6JmMI6i86bJgKrx4dzHpZmYkQ4D+r9LpqAOm1IgDlACZnCIjgHbTh6VOjNpU3jonzN1mHNxDP8Ezgjss=
   - secure: g6rm6GwWwbMe70xa25WHNvZ5NepGwda9F2e3R9iIr+EUTT/1zvZATTJfeNxt6YSCUKrxkRgO7MchjpngmVeP2bIC/0XCiiCfb46ENcINCRHxQ7jHmKIxDJypUK6rTiqsleprfGLFJ9jBUj4nEUzu0+N6EPC0hAzM5WeCZxitOifzPrs9L8/ATGJ2xvpazgkrVs0+Onv6Zn2O8XsoVaYZpUXHGIqXpZWTAyUnvRG3z/LInU7dyoiSgnoEAlruXUf+OuOAKOmiIaLBBsnyXsR2cS/kXcoQZNeTmxMjyguhC3c77OJxQ0dzJgN3pWznMNZ+Va5cetpM+P8wyeqXaVTxlLwCuj0KB8gsGKDfzHno8MHcbw71eV3/9laVmxZyOAQgeQVEj8vuclcaFIvbPMUtCGahlgPCr1l8gTVrgzdtJyEK0nf/Tk0LBS+5gvHg1aYIg6G9iqvX4oodJ8mH5RCTibWP/yOP65B5MmU/FNHFmeM4qREPWiclE351SrsraSUZ9H2onoaLBnDnNiHrr9OWaKD6BEKh66MxKS1u+Gi3Bb/xhK86JXtfq4K6OiQggbBPk/JPczn07czssAesu/gnMMuXSbkJc0m1YMBt0PtUoX4/bzTgTw485wVkBxeQYby7Q+7/vc5HKjl7OQqE73kctXWlhCuTzdF1wvcALu5oF78=
+  - secure: o69Y/rLqNHK8dzh4FQmiFoEZOF4vwqb8HcUQcl7kVKLh9mfaFtRPbrolvcRDZ7kHgUYfHi2lhNDuiQWXXQTyjPYgxm9DEWnxP8VAxQ5FIY/aqtCTSFNOzwLX6YO+698SblafMKZVSDgimZy3lvQAqcI+ZMaPvr9wDFsQDKWr6btkq/IX8JTQeBZDPDHiU0/hMACGXjn+jqGULxU9ROyKAlLx4Sd7fo9wMdb/3fA6Bwd9MkZZpo5Eqpkur2RsaYi7QCFx2fhAXZbn6it9o0pF28hs7AL87BlYDzHwlcso+/8ifiCnHaqCtlzeMSfw4hwdtU7lHdbNc6MeCpqN4YknP3PYyUbgVirRdYEs2b3WUjLg+Ks9y3DX+fKkNq58hYCC25xvDsrrquXdFcCaaLHbsYnBgloekMYls2UCUB4dDt1w13/AvobXpa8o2ADa44LmQQoUW0d6PGTnS+n6X1Cvs/T3QpRIyjHPBiL8bZbDACo3OvstKN7DP9gAmPiSHdQV1jg/jxzzPK0sYd4Y92DKc5jSe7pmAh+WK9FeCqAjt6HCGZaNrTmA6oePMRF9g8w2t9kpiFZOV3SIpAQ+EwZWYx6Jsa6fZPRxYCQdO/gCGJ5s3YlsX2J9QfrOJ+2OqKEjgwm2Hmn+O5hXrMPuOVaXDn4beSiSkB/q0X0LtUpOg2g=
 
