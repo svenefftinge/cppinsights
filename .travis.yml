@@ -91,6 +91,8 @@ matrix:
     # 4/ Linux Coverity Builds
   - os: linux
     compiler: gcc
+    cache:
+      ccache: false
     addons:
       apt:
         sources: *all_sources
@@ -104,8 +106,8 @@ matrix:
           description: "C++ Insights"
         notification_email: "andy@cppinsights.io"
         #        build_command_prepend: "cov-configure --comptype g++ --compiler /usr/bin/bin/g++-7 && cd $TRAVIS_BUILD_DIR/build && cmake -DINSIGHTS_LLVM_CONFIG=${LLVM_CONFIG} -DINSIGHTS_COVERAGE=${COVERAGE} -DINSIGHTS_STATIC=${STATIC} -DDEBUG=${DEBUG}  .."
-        build_command_prepend: "cd $TRAVIS_BUILD_DIR/build && cmake -DINSIGHTS_LLVM_CONFIG=${LLVM_CONFIG} -DINSIGHTS_COVERAGE=${COVERAGE} -DINSIGHTS_STATIC=${STATIC} -DDEBUG=${DEBUG}  .."
-        build_command: make -j 2
+        build_command_prepend: "cd $TRAVIS_BUILD_DIR/build && cov-configure --comptype g++ --compiler g++-7 --template && cmake -DINSIGHTS_LLVM_CONFIG=${LLVM_CONFIG} -DINSIGHTS_COVERAGE=${COVERAGE} -DINSIGHTS_STATIC=${STATIC} -DDEBUG=${DEBUG}  .."
+        build_command: make -j 2 VERBOSE=1
         branch_pattern: coverity_scan    
     env: COMPILER='g++-7' COMPILER_CC='gcc-7' LLVM_CONFIG=${LLVM_CONFIG_CURRENT} STATIC='No' COVERAGE='Yes' DEBUG='No' COVERITY_RUN=1 NO_LINKING=Yes
 
@@ -152,6 +154,7 @@ script:
   if [ "${COVERITY_RUN}" != 1 ]; then
     make -j 2
   fi
+- cat  /home/travis/build/andreasfertig/cppinsights/build/cov-int/build-log.txt
 - |
   if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then
     make tests
